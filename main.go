@@ -2,20 +2,22 @@ package main
 
 import (
 	"fmt"
+	mediainfo "github.com/lbryio/go_mediainfo"
 	"io/ioutil"
 	"path/filepath"
 	"sync"
 )
 
-var videoFormats = []string{"mp4", "mkv"}
-
 func readFileInfo(fileName, filePath string, wg *sync.WaitGroup)  {
 	defer wg.Done()
-	for _, ext := range videoFormats {
-		stat, _ := filepath.Match("*." + ext, fileName)
-		if stat {
-			fmt.Println(fileName)
-		}
+	info, err := mediainfo.GetMediaInfo(filePath)
+	if err != nil {
+		fmt.Println("Error in reading: ", err)
+	}
+	if info.Video.CodecID != "" {
+		fmt.Println("Video", info)
+	} else if info.SubtitlesCnt != 0 {
+		fmt.Println("Subtitles", info)
 	}
 }
 

@@ -1,13 +1,9 @@
 package main
 
 import (
-	"database/sql"
+	"context"
 	"fmt"
-	"github.com/jackc/pgx"
-	_ "github.com/jackc/pgx"
-	"github.com/jackc/pgx/stdlib"
-
-	/*	_ "github.com/mattn/go-sqlite3"*/
+	"github.com/jackc/pgx/v4/pgxpool"
 	"io/ioutil"
 	"log"
 	"path/filepath"
@@ -16,7 +12,7 @@ import (
 	"time"
 )
 
-func recursiveRead(dirPath string, wg *sync.WaitGroup, fileInfo func(string, string, *sync.WaitGroup, *sql.DB, *movies.ItemList, *movies.ItemList), db *sql.DB, mlist *movies.ItemList, slist *movies.ItemList)  {
+func recursiveRead(dirPath string, wg *sync.WaitGroup, fileInfo func(string, string, *sync.WaitGroup, *pgxpool.Pool, *movies.ItemList, *movies.ItemList), db *pgxpool.Pool, mlist *movies.ItemList, slist *movies.ItemList)  {
 	defer wg.Done()
 	items, err := ioutil.ReadDir(dirPath)
 	if err != nil {
@@ -34,7 +30,7 @@ func recursiveRead(dirPath string, wg *sync.WaitGroup, fileInfo func(string, str
 	}
 }
 
-func scan(dirPath string, fileInfo func(string, string, *sync.WaitGroup, *sql.DB, *movies.ItemList, *movies.ItemList), db *sql.DB, mlist *movies.ItemList, slist *movies.ItemList)  {
+func scan(dirPath string, fileInfo func(string, string, *sync.WaitGroup, *pgxpool.Pool, *movies.ItemList, *movies.ItemList), db *pgxpool.Pool, mlist *movies.ItemList, slist *movies.ItemList)  {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go recursiveRead(dirPath, &wg, fileInfo, db, mlist, slist)
@@ -42,30 +38,32 @@ func scan(dirPath string, fileInfo func(string, string, *sync.WaitGroup, *sql.DB
 }
 
 func main()  {
-	driverConfig := stdlib.DriverConfig{
-		ConnConfig: pgx.ConnConfig{
-		},
-	}
-
-	stdlib.RegisterDriverConfig(&driverConfig)
 	start := time.Now()
-	database, err := sql.Open("pgx", "postgres://ayush:testpass@localhost/test")
+	pool, err := setUpDb()
 	if err != nil {
-		fmt.Println("Error Opening database", err)
 		return
 	}
-	defer database.Close()
-	movies.PrepareDb(database)
-	movieList := movies.GetAllRecords(database, "movies")
-	subtitleList := movies.GetAllRecords(database, "subtitles")
+	defer pool.Close()
+	movieList := movies.GetAllRecords(pool, "movies")
+	subtitleList := movies.GetAllRecords(pool, "subtitles")
 	testPath, err := filepath.Abs("/mnt/media/Videos/Hollywood Movies")
 	if err != nil {
 		fmt.Println("Error getting current path", err)
 		return
 	}
-	scan(testPath, movies.ReadFileInfo, database, movieList, subtitleList)
-	movies.CleanDb(database, movieList, "movies")
-	movies.CleanDb(database, subtitleList, "subtitles")
+	scan(testPath, movies.ReadFileInfo, pool, movieList, subtitleList)
+	movies.CleanDb(pool, movieList, "movies")
+	movies.CleanDb(pool, subtitleList, "subtitles")
 	elapsed := time.Since(start)
 	log.Printf("Took %s", elapsed)
+}
+
+func setUpDb() (*pgxpool.Pool, error) {
+	pool, err := pgxpool.Connect(context.Background(), "postgres://ayush:testpass@localhost/test")
+	if err != nil {
+		fmt.Println("Error Opening database", err)
+		return nil, err
+	}
+	movies.PrepareDb(pool)
+	return pool, err
 }

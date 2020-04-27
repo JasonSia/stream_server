@@ -36,5 +36,5 @@ const (
 
 type ItemList struct {
 	mu    sync.Mutex
-	items map[string]string
+	items map[string]uuid.UUID
 }

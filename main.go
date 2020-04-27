@@ -3,11 +3,17 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	_ "github.com/mattn/go-sqlite3"
+	"github.com/jackc/pgx"
+	_ "github.com/jackc/pgx"
+	"github.com/jackc/pgx/stdlib"
+
+	/*	_ "github.com/mattn/go-sqlite3"*/
 	"io/ioutil"
+	"log"
 	"path/filepath"
 	"server/movies"
 	"sync"
+	"time"
 )
 
 func recursiveRead(dirPath string, wg *sync.WaitGroup, fileInfo func(string, string, *sync.WaitGroup, *sql.DB, *movies.ItemList, *movies.ItemList), db *sql.DB, mlist *movies.ItemList, slist *movies.ItemList)  {
@@ -36,7 +42,14 @@ func scan(dirPath string, fileInfo func(string, string, *sync.WaitGroup, *sql.DB
 }
 
 func main()  {
-	database, err := sql.Open("sqlite3", "./temp.db")
+	driverConfig := stdlib.DriverConfig{
+		ConnConfig: pgx.ConnConfig{
+		},
+	}
+
+	stdlib.RegisterDriverConfig(&driverConfig)
+	start := time.Now()
+	database, err := sql.Open("pgx", "postgres://ayush:testpass@localhost/test")
 	if err != nil {
 		fmt.Println("Error Opening database", err)
 		return
@@ -45,7 +58,7 @@ func main()  {
 	movies.PrepareDb(database)
 	movieList := movies.GetAllRecords(database, "movies")
 	subtitleList := movies.GetAllRecords(database, "subtitles")
-	testPath, err := filepath.Abs("test")
+	testPath, err := filepath.Abs("/mnt/media/Videos/Hollywood Movies")
 	if err != nil {
 		fmt.Println("Error getting current path", err)
 		return
@@ -53,4 +66,6 @@ func main()  {
 	scan(testPath, movies.ReadFileInfo, database, movieList, subtitleList)
 	movies.CleanDb(database, movieList, "movies")
 	movies.CleanDb(database, subtitleList, "subtitles")
+	elapsed := time.Since(start)
+	log.Printf("Took %s", elapsed)
 }

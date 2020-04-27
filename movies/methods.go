@@ -142,7 +142,7 @@ func GetAllRecords(db *sql.DB, tableName string) *ItemList {
 }
 
 func(m *movie) Add(db *sql.DB)  {
-	statement, err := db.Prepare("INSERT INTO movies VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+	statement, err := db.Prepare("INSERT INTO movies VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)")
 	if err != nil {
 		fmt.Println("Error Adding to database", err)
 		return
@@ -162,7 +162,7 @@ func(m *movie) Update(db *sql.DB)  {
 }
 
 func(s *subtitle) Add(db *sql.DB)  {
-	statement, err := db.Prepare("INSERT INTO subtitles VALUES (?, ?, ?, ?)")
+	statement, err := db.Prepare("INSERT INTO subtitles VALUES ($1, $2, $3, $4)")
 	if err != nil {
 		fmt.Println("Error Adding to database", err)
 		return
@@ -183,7 +183,7 @@ func(s *subtitle) Update(db *sql.DB)  {
 
 
 func RemoveItem(db *sql.DB, id string, tableName string)  {
-	statement, err := db.Prepare("DELETE FROM ? WHERE id = ?")
+	statement, err := db.Prepare("DELETE FROM " + tableName + " WHERE id = ?")
 	if err != nil {
 		fmt.Println("Error Removing movie", err)
 		return

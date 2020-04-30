@@ -56,6 +56,7 @@ func main()  {
 	scan(testPath, movies.ReadFileInfo, pool, movieList, subtitleList, &t)
 	movies.CleanDb(pool, movieList, "movies")
 	movies.CleanDb(pool, subtitleList, "subtitles")
+	movies.MapSubtitles(pool)
 	elapsed := time.Since(start)
 	log.Printf("Took %s", elapsed)
 }

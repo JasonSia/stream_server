@@ -90,9 +90,10 @@ func processSubtitles(fileName, filePath string, db *pgxpool.Pool, info *mediain
 			fmt.Println("Error in creating id", err)
 			return
 		}
+		temp := strings.LastIndex(fileName, ".")
 		s := subtitle{
 			id: id,
-			fileName: fileName,
+			fileName: fileName[:temp],
 			path: filePath,
 			title: info.Subtitles[0].Title,
 		}
@@ -100,17 +101,59 @@ func processSubtitles(fileName, filePath string, db *pgxpool.Pool, info *mediain
 	}
 }
 
-func MapSubtitles() {
-	
+func MapSubtitles(db *pgxpool.Pool) {
+	var count uint
+	err := db.QueryRow(context.Background(), "SELECT COUNT(*) FROM movies").Scan(&count)
+	rows, err := db.Query(context.Background(), "SELECT id, file_name FROM movies")
+	if err != nil {
+		fmt.Println("Error in querying records", err)
+		return
+	}
+	defer rows.Close()
+	tempList := make(map[string]uuid.UUID, count)
+	var name string
+	var id uuid.UUID
+	for rows.Next() {
+		err := rows.Scan(&id, &name)
+		if err != nil {
+			log.Fatal(err)
+		}
+		tempList[name] = id
+	}
+	for key, val := range tempList {
+		_, _ = db.Exec(context.Background(), "UPDATE subtitles SET movie_id = $1 WHERE file_name = $2", val, key)
+	}
 }
 
 func PrepareDb(db *pgxpool.Pool)  {
-	_, err := db.Exec(context.Background(), "CREATE TABLE IF NOT EXISTS movies (id UUID PRIMARY KEY, name TEXT, fileName TEXT, path TEXT, year INTEGER, width INTEGER, height INTEGER, status INTEGER, duration INTEGER, video_codec TEXT, audio_codec TEXT)")
+	_, err := db.Exec(context.Background(), "CREATE TABLE IF NOT EXISTS movies " +
+		"(" +
+		"id UUID PRIMARY KEY, " +
+		"name TEXT, " +
+		"file_name TEXT, " +
+		"path TEXT, " +
+		"year INTEGER, " +
+		"width INTEGER, " +
+		"height INTEGER, " +
+		"status INTEGER, " +
+		"duration INTEGER, " +
+		"video_codec TEXT, " +
+		"audio_codec TEXT" +
+		")")
 	if err != nil {
 		fmt.Println("Error Creating Movies Table", err)
 		return
 	}
-	_, err = db.Exec(context.Background(), "CREATE TABLE IF NOT EXISTS subtitles (id UUID PRIMARY KEY, fileName TEXT, path TEXT, title TEXT)")
+	_, err = db.Exec(context.Background(), "CREATE TABLE IF NOT EXISTS subtitles " +
+		"(" +
+		"id UUID, " +
+		"movie_id UUID, " +
+		"file_name TEXT, " +
+		"path TEXT, " +
+		"title TEXT, " +
+		"PRIMARY KEY (id), " +
+		"FOREIGN KEY (movie_id) REFERENCES movies(id) ON DELETE CASCADE" +
+		")")
 	if err != nil {
 		fmt.Println("Error Creating Subtitles Table", err)
 		return
@@ -166,7 +209,7 @@ func(m *movie) Update(db *pgxpool.Pool)  {
 }
 
 func(s *subtitle) Add(db *pgxpool.Pool)  {
-	_, err := db.Exec(context.Background(), "INSERT INTO subtitles VALUES ($1, $2, $3, $4)", s.id, s.fileName, s.path, s.title)
+	_, err := db.Exec(context.Background(), "INSERT INTO subtitles VALUES ($1, NULL, $2, $3, $4)", s.id, s.fileName, s.path, s.title)
 	if err != nil {
 		fmt.Println("Error Adding to database", err)
 		return

@@ -34,6 +34,9 @@ const (
 	WATCHED = iota
 )
 
+// In minutes
+const MinMovieTime = 15
+
 type ItemList struct {
 	mu    sync.Mutex
 	items map[string]uuid.UUID
